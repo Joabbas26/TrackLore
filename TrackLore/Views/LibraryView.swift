@@ -10,54 +10,80 @@ struct LibraryView: View {
     @State private var librarySongs: [Song] = []
 
     var body: some View {
-        List(librarySongs) { song in
-            HStack(alignment: .top, spacing: 12) {
-                if let url = song.artworkURL {
-                    AsyncImage(url: url) { image in
-                        image.resizable().scaledToFit()
-                    } placeholder: {
-                        ProgressView()
-                    }
-                    .frame(width: 50, height: 50)
-                } else {
-                    Image(systemName: "music.note")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 50, height: 50)
-                        .foregroundColor(.gray)
+        VStack(spacing: 0) {
+            HStack {
+                Text("Recent Matches")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                Spacer()
+                Button("Clear") {
+                    SongHistoryManager.shared.clear()
+                    librarySongs = []
                 }
+                .foregroundColor(.red)
+            }
+            .padding()
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(song.title)
-                        .font(.headline)
-                        .foregroundColor(.white)
+            if librarySongs.isEmpty {
+                Spacer()
+                Text("No history yet")
+                    .foregroundColor(.gray)
+                Spacer()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(librarySongs) { song in
+                            HStack(spacing: 12) {
+                                if let url = song.artworkURL {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().scaledToFill()
+                                    } placeholder: {
+                                        ProgressView()
+                                    }
+                                    .frame(width: 50, height: 50)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                } else {
+                                    Image(systemName: "music.note")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 50, height: 50)
+                                        .foregroundColor(.gray)
+                                }
 
-                    Text(song.artist)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(song.title)
+                                        .font(.headline)
+                                        .foregroundColor(.white)
 
-                    Text("From: \(song.source)")
-                        .font(.caption)
-                        .foregroundColor(.yellow)
+                                    Text(song.artist)
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
 
-                    if let animeInfo = song.animeInfo {
-                        Text(animeInfo)
-                            .font(.caption)
-                            .foregroundColor(.green)
+                                    if let animeInfo = song.animeInfo {
+                                        Text(animeInfo)
+                                            .font(.caption)
+                                            .foregroundColor(.green)
+                                    }
+                                }
+
+                                Spacer()
+
+                                if let url = song.appleMusicURL {
+                                    Link(destination: url) {
+                                        Image(systemName: "link")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
                     }
+                    .padding(.top)
                 }
             }
-            .contextMenu {
-                if let url = song.appleMusicURL {
-                    Button("Open in Apple Music") {
-                        UIApplication.shared.open(url)
-                    }
-                }
-            }
-            .padding(.vertical, 8)
         }
         .background(Color.black.edgesIgnoringSafeArea(.all))
-        .navigationTitle("Library")
         .onAppear {
             librarySongs = SongHistoryManager.shared.load()
         }

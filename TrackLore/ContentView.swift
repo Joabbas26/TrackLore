@@ -54,6 +54,13 @@ struct ContentView: View {
                         .font(.headline)
                 }
 
+                if let status = viewModel.recognitionStatus {
+                    Text(status)
+                        .font(.subheadline)
+                        .foregroundColor(.red)
+                        .padding(.top, 5)
+                }
+
                 if viewModel.isListening {
                     GlassButton(title: "Stop Listening") {
                         viewModel.stopRecognition()

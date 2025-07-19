@@ -15,7 +15,9 @@ class SongHistoryManager {
     func save(_ song: Song) {
         var history = load()
         history.insert(song, at: 0) // newest first
-        if history.count > 50 { history = Array(history.prefix(50)) }
+        if history.count > 20 {
+            history = Array(history.prefix(20))
+        }
         if let data = try? JSONEncoder().encode(history) {
             UserDefaults.standard.set(data, forKey: key)
         }

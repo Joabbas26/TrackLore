@@ -35,10 +35,18 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		257AE9EC2E296B6E005D0FBE /* Exceptions for "TrackLore" folder in "TrackLoreTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Views/TestMicView.swift,
+			);
+			target = 25D89F112E0CB5C200E827A6 /* TrackLoreTests */;
+		};
 		25D89F362E0CBC5600E827A6 /* Exceptions for "TrackLore" folder in "TrackLore" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				Views/TestMicView.swift,
 			);
 			target = 25D89F042E0CB5C000E827A6 /* TrackLore */;
 		};
@@ -49,6 +57,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				25D89F362E0CBC5600E827A6 /* Exceptions for "TrackLore" folder in "TrackLore" target */,
+				257AE9EC2E296B6E005D0FBE /* Exceptions for "TrackLore" folder in "TrackLoreTests" target */,
 			);
 			path = TrackLore;
 			sourceTree = "<group>";
