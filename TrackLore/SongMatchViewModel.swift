@@ -132,7 +132,7 @@ class SongMatchViewModel: NSObject, ObservableObject {
                     do {
                         let signature = try self.signatureGenerator.signature() // Generate the final signature
                         print("📝 Signature generated. Length: \(signature.dataRepresentation.count) bytes")
-                        self.recognitionStatus = "🧠 Matching with Shazam..."
+                        self.recognitionStatus = "🧠 Matching..."
                         self.session.match(signature) // Send signature to Shazam for matching
                     } catch {
                         print("❌ Signature generation failed: \(error.localizedDescription)")
@@ -177,83 +177,74 @@ class SongMatchViewModel: NSObject, ObservableObject {
     }
 
 
-    /// Fetches anime or media source information for a given title.
-    func fetchAnimeOrMediaSource(for title: String) async -> String? {
-        if let mediaMatch = await fetchMovieOrTVTheme(for: title) {
-            return mediaMatch
-        } else if let animeMatch = await fetchAnimeTheme(for: title) {
-            return animeMatch
-        } else {
-            return nil
+    /// Fetches media info using Gemini API for a given song title and artist.
+    func fetchMediaInfoFromGemini(title: String, artist: String) async -> (sourceTitle: String?, sourceType: String?) {
+        let prompt = """
+        Based on the song "\(title)" by "\(artist)", tell me if it is used as a theme song in any movie, TV show, or anime.
+        Respond ONLY in this JSON format:
+        {
+            "sourceTitle": "Friends",
+            "sourceType": "TV Show"
         }
-    }
+        If there is no known usage, respond with:
+        {
+            "sourceTitle": null,
+            "sourceType": null
+        }
+        """
 
-    /// Fetches anime theme information from Jikan API.
-    private func fetchAnimeTheme(for title: String, artist: String = "") async -> String? {
-        let query = "\(title) \(artist)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
-        let urlString = "https://api.jikan.moe/v4/anime?q=\(query)&sfw=true"
-        guard let url = URL(string: urlString) else { return nil }
-        print("🔍 Searching Jikan with query: \(urlString)")
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=\(Secrets.geminiApiKey)") else {
+            print("❌ Gemini API URL construction failed")
+            return (nil, nil)
+        }
+
+        let requestBody: [String: Any] = [
+            "contents": [
+                [
+                    "parts": [
+                        ["text": prompt]
+                    ]
+                ]
+            ]
+        ]
+
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: requestBody) else {
+            print("❌ Gemini API: Failed to encode JSON body")
+            return (nil, nil)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = httpBody
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(for: request)
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-                print("Jikan API HTTP Error: \(httpResponse.statusCode)")
-                return nil
+                print("Gemini API HTTP Error: \(httpResponse.statusCode)")
+                return (nil, nil)
             }
-            let decoded = try JSONDecoder().decode(JikanAnimeSearchResponse.self, from: data)
 
-            for anime in decoded.data {
-                if let openings = anime.theme.openings {
-                    print("📺 Found anime title: \(anime.title)")
-                    if openings.isEmpty {
-                        print("⚠️ No openings found for this anime.")
-                    }
-                    print("🎵 Openings: \(openings)")
-                    for opening in openings {
-                        print("🔎 Checking opening: \(opening)")
-                        if opening.lowercased().contains(title.lowercased()) ||
-                           opening.lowercased().contains(artist.lowercased()) {
-                            return "Anime Opening: \(anime.title)"
-                        }
-                    }
-                }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let candidates = json["candidates"] as? [[String: Any]],
+               let content = candidates.first?["content"] as? [String: Any],
+               let parts = content["parts"] as? [[String: Any]],
+               let text = parts.first?["text"] as? String,
+               let resultData = text.data(using: .utf8),
+               let parsedResult = try? JSONSerialization.jsonObject(with: resultData) as? [String: Any] {
+                
+                let sourceTitle = parsedResult["sourceTitle"] as? String
+                let sourceType = parsedResult["sourceType"] as? String
+                print("🔮 Gemini API parsed result: sourceTitle=\(sourceTitle ?? "nil"), sourceType=\(sourceType ?? "nil")")
+                return (sourceTitle, sourceType)
             }
+
+            print("Gemini API: Unexpected response format")
         } catch {
-            print("Jikan API error: \(error.localizedDescription)")
+            print("Gemini API error: \(error.localizedDescription)")
         }
-        return nil
-    }
 
-    /// Fetches movie or TV theme information from TMDb API.
-    private func fetchMovieOrTVTheme(for title: String) async -> String? {
-        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
-        let apiKey = Secrets.tmdbApiKey
-        let urlString = "https://api.themoviedb.org/3/search/multi?api_key=\(apiKey)&query=\(query)"
-        guard let url = URL(string: urlString) else { return nil }
-        print("🔍 Searching TMDB with query: \(urlString)")
-
-        do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-                print("TMDB API HTTP Error: \(httpResponse.statusCode)")
-                return nil
-            }
-            let result = try JSONDecoder().decode(TMDbSearchResponse.self, from: data)
-            print("🧾 TMDB returned \(result.results.count) result(s).")
-
-            if let match = result.results.first {
-                if let name = match.name ?? match.title {
-                    print("✅ TMDB match: \(name) - \(match.media_type)")
-                    return "\(match.media_type.capitalized): \(name)"
-                } else {
-                    print("⚠️ TMDB match found, but no name/title.")
-                }
-            }
-        } catch {
-            print("TMDB API error: \(error.localizedDescription)")
-        }
-        return nil
+        return (nil, nil)
     }
 }
 
@@ -269,17 +260,23 @@ extension SongMatchViewModel: SHSessionDelegate {
                 print("🔍 Shazam matched title: \(rawTitle)")
 
                 let artist = item.artist?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                let query = "\(rawTitle) \(artist)"
-                print("🎯 Querying for media source with: \(query)")
-                let sourceInfo = await self.fetchAnimeOrMediaSource(for: query)
+                print("🎯 Querying Gemini API for media info with: \(rawTitle) / \(artist)")
+                let (sourceTitle, sourceType) = await self.fetchMediaInfoFromGemini(title: rawTitle, artist: artist)
+
+                let sourceDescription: String
+                if let sourceTitle = sourceTitle, let sourceType = sourceType {
+                    sourceDescription = "\(sourceTitle) (\(sourceType))"
+                } else {
+                    sourceDescription = "Shazam"
+                }
 
                 let song = Song(
                     title: item.title ?? "Unknown Title",
                     artist: item.artist ?? "Unknown Artist",
                     artworkURL: item.artworkURL,
                     appleMusicURL: item.appleMusicURL,
-                    source: sourceInfo ?? "Shazam",
-                    animeInfo: sourceInfo
+                    source: sourceDescription,
+                    animeInfo: sourceDescription
                 )
 
                 self.isListening = false
@@ -320,30 +317,4 @@ extension SongMatchViewModel: SHSessionDelegate {
             self.deactivateAudioSession() // Deactivate session after match attempt (failure)
         }
     }
-}
-
-// MARK: - Jikan API Decoding (As provided by you)
-struct JikanAnimeSearchResponse: Codable {
-    let data: [JikanAnime]
-}
-
-struct JikanAnime: Codable {
-    let title: String
-    let theme: JikanTheme
-}
-
-struct JikanTheme: Codable {
-    let openings: [String]?
-    let endings: [String]?
-}
-
-// MARK: - TMDB API Decoding (As provided by you)
-struct TMDbSearchResponse: Codable {
-    let results: [TMDbMedia]
-}
-
-struct TMDbMedia: Codable {
-    let title: String?
-    let name: String?
-    let media_type: String // "movie", "tv"
 }

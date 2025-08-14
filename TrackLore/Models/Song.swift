@@ -13,8 +13,8 @@ struct Song: Identifiable, Hashable, Codable {
     let artist: String
     let artworkURL: URL?
     let appleMusicURL: URL?
-    let source: String
-    var animeInfo: String?  // <-- add this
+    let sourceTitle: String?
+    let sourceType: String?
 
     init(
         id: UUID = UUID(),
@@ -22,15 +22,15 @@ struct Song: Identifiable, Hashable, Codable {
         artist: String,
         artworkURL: URL?,
         appleMusicURL: URL?,
-        source: String,
-        animeInfo: String? = nil
+        sourceTitle: String? = nil,
+        sourceType: String? = nil
     ) {
         self.id = id
         self.title = title
         self.artist = artist
         self.artworkURL = artworkURL
         self.appleMusicURL = appleMusicURL
-        self.source = source
-        self.animeInfo = animeInfo
+        self.sourceTitle = sourceTitle
+        self.sourceType = sourceType
     }
 }
